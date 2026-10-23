@@ -163,6 +163,16 @@
     const own = (Array.isArray(item.contentReferences) ? item.contentReferences : []).filter(reference =>
       reference?.type === 'dil' && id && reference.source_message_id === id &&
       typeof reference.model_dil_v2?.fallbackMarkdown === 'string' && reference.model_dil_v2.fallbackMarkdown.trim());
+    if (own.length !== 1 && (content.trim() === 'DilResponseRoot' || ONLY_CONTENT_REFERENCES.test(content))) {
+      console.warn('cos-dil-structure', { messageId: id, contentKind: content.trim() === 'DilResponseRoot' ? 'root' : 'reference',
+        referencesCount: Array.isArray(item.contentReferences) ? item.contentReferences.length : -1,
+        referenceShapes: (Array.isArray(item.contentReferences) ? item.contentReferences : []).slice(0, 8).map(ref => ({
+          type: typeof ref?.type === 'string' ? ref.type : null,
+          sourceMessageId: typeof ref?.source_message_id === 'string' ? ref.source_message_id : null,
+          sourceMatches: !!id && ref?.source_message_id === id,
+          hasFallback: typeof ref?.model_dil_v2?.fallbackMarkdown === 'string' && !!ref.model_dil_v2.fallbackMarkdown.trim(),
+          modelKeys: ref?.model_dil_v2 && typeof ref.model_dil_v2 === 'object' ? Object.keys(ref.model_dil_v2).slice(0, 12) : [] })) });
+    }
     return own.length === 1 ? unescapeFallbackMarkdown(own[0].model_dil_v2.fallbackMarkdown).slice(0, MAX_RENDERED_TEXT) : content;
   }
   /** A display formula longer than this is not looked for; its lines are read as plain text. */
