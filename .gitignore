@@ -51,3 +51,5 @@ proof-*.txt
 
 # Written by scripts/write-extension-stamp.mjs at packaging time; see that script.
 /extension/build-stamp.txt
+# Assembled from the reviewed fiber-src parts by scripts/build-fiber.mjs.
+/extension/fiber.js

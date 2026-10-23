@@ -24,6 +24,8 @@ function run(command, commandArgs, env = process.env) {
 }
 
 const node = process.execPath;
+// Assemble the shared MAIN-world fiber closure before any extension packaging.
+run(node, ['scripts/build-fiber.mjs']);
 // electron-builder can download its own runtime into its cache, but our package also copies
 // Electron's LICENSE files from node_modules/electron/dist. A fresh npm install may leave that
 // package payload lazy until Electron itself is resolved, so make the local runtime materialize
