@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inboundRequestId, requestIdFromHeader, withInboundRequestId } from '../src/main/mcp/inbound.js';
+import { inboundRequestId, requestIdFromHeader, requestIdHeaderShape, withInboundRequestId } from '../src/main/mcp/inbound.js';
 
 describe('MCP inbound request id boundary', () => {
   it('normalizes the raw x-request-id to the page join key once at ingress', () => {
@@ -14,6 +14,14 @@ describe('MCP inbound request id boundary', () => {
     expect(requestIdFromHeader('wfr.bad/suffix')).toBeNull();
     expect(requestIdFromHeader('x'.repeat(101))).toBeNull();
     expect(requestIdFromHeader(undefined)).toBeNull();
+  });
+
+  it('classifies ingress without logging or inventing identity', () => {
+    expect(requestIdHeaderShape(undefined)).toBe('absent');
+    expect(requestIdHeaderShape('bad.id')).toBe('invalid');
+    expect(requestIdHeaderShape(['wfr_a', 'wfr_b'])).toBe('ambiguous');
+    expect(requestIdHeaderShape('wfr_a/hop')).toBe('normalized');
+    expect(requestIdFromHeader(['wfr_a', 'wfr_b'])).toBeNull();
   });
 
   it('keeps normalized ids isolated across concurrent async requests', async () => {

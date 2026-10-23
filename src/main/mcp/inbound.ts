@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { logInfo } from '../logger.js';
 import type { OutputPublication } from '../codex/unified-exec.js';
 
 /**
@@ -78,7 +79,19 @@ export function inboundRequestId(): string | null {
  * Only the part before the `/` matches the page: the suffix is per-hop and differs between
  * the header and the message model.
  */
+export function requestIdHeaderShape(value: string | string[] | undefined): 'absent' | 'ambiguous' | 'invalid' | 'normalized' {
+  if (value === undefined) return 'absent';
+  if (Array.isArray(value) && value.length !== 1) return 'ambiguous';
+  return parseRequestIdHeader(value) ? 'normalized' : 'invalid';
+}
+
 export function requestIdFromHeader(value: string | string[] | undefined): string | null {
+  const result = parseRequestIdHeader(value);
+  logInfo(`mcp ingress request-id shape=${requestIdHeaderShape(value)} normalized=${Boolean(result)}`);
+  return result;
+}
+
+function parseRequestIdHeader(value: string | string[] | undefined): string | null {
   // Identity evidence is not a "pick one" field. If a proxy/runtime ever gives us duplicate
   // request-id values, choosing the first would turn an ambiguous request into authority for
   // one conversation. Fail closed instead. (A one-element array is only a representation
