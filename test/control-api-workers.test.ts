@@ -225,10 +225,12 @@ it('cannot use another local owner or a ChatGPT prime family through its run id'
   const otherOwner = '22222222-2222-4222-8222-222222222222';
   const own = (await worker('spawn', { ownerId, workers: [{ task: 'Owner one.' }] })).body;
   const foreign = (await worker('spawn', { ownerId: otherOwner, workers: [{ task: 'Owner two.' }] })).body;
-  expect((await worker('status', { ownerId, runId: foreign.runId })).status).toBe(500);
-  expect((await worker('message', { ownerId, runId: foreign.runId, messages: [{ to: 'worker-1', text: 'Wrong owner.' }] })).status).toBe(500);
+  expect((await worker('status', { ownerId, runId: foreign.runId })).status).toBe(404);
+  expect((await worker('reports', { ownerId, runId: foreign.runId })).status).toBe(404);
+  expect((await worker('ack', { ownerId, runId: foreign.runId, messageIds: ['forbidden'] })).status).toBe(404);
+  expect((await worker('message', { ownerId, runId: foreign.runId, messages: [{ to: 'worker-1', text: 'Wrong owner.' }] })).status).toBe(404);
   const chat = broker.spawn({ caller: { conversationId: 'chatgpt-prime' }, workers: [{ task: 'Existing ChatGPT family.' }] });
-  expect((await worker('status', { ownerId, runId: chat.runId })).status).toBe(500);
+  expect((await worker('status', { ownerId, runId: chat.runId })).status).toBe(404);
   expect((await worker('status', { ownerId, runId: own.runId })).body.workers).toMatchObject([{ id: 'worker-1', state: 'invited' }]);
   expect((await worker('status', { ownerId: otherOwner, runId: foreign.runId })).body.workers).toMatchObject([{ id: 'worker-1', state: 'invited' }]);
 });

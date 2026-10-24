@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { acknowledgeLocalReports, offerMessagesForCaller, persistCriticalSwarmNow, requestWorkerBootstraps,
-  requestWorkerRevivals, stageMessages, statusForCaller, type Caller } from './agents.js';
+  requestWorkerRevivals, stageMessages, statusForCaller, AgentsBusyError, type Caller } from './agents.js';
 import { acceptAgentMutation, measureSleepingWorkers, spawnAgentWorkers } from './agent-admission.js';
 import { effectiveCapabilities, getConfig } from './config.js';
 import { RequestError } from './control-reads.js';
@@ -35,10 +35,18 @@ function enabled(): void {
   if (!config.multiAgent.enabled) throw new RequestError(403, 'workers_disabled');
 }
 
+function checkedStatus(caller: Caller) {
+  try { return statusForCaller(caller); }
+  catch (error) {
+    if (error instanceof AgentsBusyError) throw new RequestError(404, 'unknown_run');
+    throw error;
+  }
+}
+
 async function status(caller: Caller) {
   await measureSleepingWorkers(caller);
   enabled();
-  const current = statusForCaller(caller);
+  const current = checkedStatus(caller);
   const workers = [];
   for (const worker of current.state.agents.filter(agent => agent.role === 'worker')) {
     const session = worker.conversationId ? await findSessionByConversation(worker.conversationId, { requireUnique: true }) : null;
@@ -64,7 +72,7 @@ export async function serveWorkerRead(route: string, params: URLSearchParams): P
   if (!result.success) throw new RequestError(400, 'invalid_query');
   const caller = { ...selected.caller, ...result.data };
   if (!selected.action) return status(caller);
-  statusForCaller(caller); // Reject foreign/unknown run selection before any inbox offer.
+  checkedStatus(caller); // Reject foreign/unknown run selection before any inbox offer.
   const offered = offerMessagesForCaller(caller)?.messages ?? [];
   return { messages: offered.map(message => ({ id: message.id, runId: message.runId ?? caller.runId ?? null,
     from: message.from, time: message.time, text: redactSecretText(message.text) })) };
@@ -105,6 +113,7 @@ export async function serveWorkerAction(method: string, route: string, raw: unkn
   if (selected.action === 'message') {
     const body = parse(messageBody, raw);
     const caller = { ...selected.caller, runId: body.runId };
+    checkedStatus(caller);
     await measureSleepingWorkers(caller);
     authorizeCurrent();
     const staged = stageMessages(caller, body.messages);
@@ -114,6 +123,7 @@ export async function serveWorkerAction(method: string, route: string, raw: unkn
   }
   const body = parse(ackBody, raw);
   authorizeCurrent();
+  checkedStatus({ ...selected.caller, runId: body.runId });
   const acknowledged = acknowledgeLocalReports({ ...selected.caller, runId: body.runId }, body.messageIds);
   if (!(await persistCriticalSwarmNow())) throw new RequestError(503, 'broker_persistence_failed');
   return { status: 200, body: { acknowledged: acknowledged.map(message => message.id) } };
